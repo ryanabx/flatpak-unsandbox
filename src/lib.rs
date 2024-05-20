@@ -18,12 +18,13 @@ pub enum UnsandboxError {
 
 /// Runs this program, or an optional `program` outside of the flatpak sandbox.
 /// > **NOTE:** You must have the permission `--talk-name=org.freedesktop.Flatpak` enabled
-pub fn unsandbox(program: Option<PathBuf>) -> Result<(), UnsandboxError> {
+/// Returns `true` if the program was executed by this function, `false` otherwise.
+pub fn unsandbox(program: Option<PathBuf>) -> Result<bool, UnsandboxError> {
     let program = program.unwrap_or(env::current_exe()?);
     let program = if is_flatpaked() {
         get_flatpak_app_dir(&program)?
     } else {
-        program
+        return Ok(false);
     };
     let args = env::args();
     // Run program. This will halt execution on the main thread.
@@ -32,7 +33,7 @@ pub fn unsandbox(program: Option<PathBuf>) -> Result<(), UnsandboxError> {
         .arg(program)
         .args(args)
         .status()?;
-    Ok(())
+    Ok(true)
 }
 
 fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
