@@ -1,0 +1,16 @@
+[package]
+name = "flatpak-unsandbox"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ryan Brue <ryanbrue@gmail.com>"]
+license = "MIT"
+categories = ["os::linux-apis"]
+keywords = ["flatpak", "sandbox"]
+repository = "https://github.com/ryanabx/flatpak-unsandbox"
+description = "Run your flatpak app outside of the sandbox."
+readme = "README.md"
+
+[dependencies]
+gio = "0.19.5"
+glib = "0.19.6"
+thiserror = "1.0.61"
