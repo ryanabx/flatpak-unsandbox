@@ -25,6 +25,19 @@ This rust crate allows rust flatpak apps to run themselves outside of the sandbo
 
 > **WARNING:** Packaging these apps through flatpak might be a bad idea because we can't ensure dependencies exist on the host system!
 
+## Example usage
+
+```rust
+// src/main.rs
+fn main() -> Result<(), MyError> {
+    if flatpak_unsandbox::unsandbox(None) {
+        return Ok(())
+    }
+    // Unsandboxed functionality here...
+}
+
+```
+
 ## Contributing
 
 Not much needs to be updated for this crate, but if there are issues with it, you may submit a bug report or attempt to fix the issue and make a PR!
