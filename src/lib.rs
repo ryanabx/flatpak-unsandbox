@@ -35,7 +35,7 @@ impl Default for Program {
     fn default() -> Self {
         Self {
             path: env::current_exe().unwrap(),
-            args: env::args().collect::<Vec<_>>(),
+            args: env::args().skip(1).collect::<Vec<_>>(),
         }
     }
 }
@@ -71,8 +71,7 @@ fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
     )?;
     Ok(Path::new(
         &flatpak_info
-            .string("Instance", "app-path")
-            .unwrap()
+            .string("Instance", "app-path")?
             .to_string(),
     )
     .join(app_dir))
