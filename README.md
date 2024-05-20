@@ -27,6 +27,8 @@ This rust crate allows rust flatpak apps to run themselves outside of the sandbo
 
 ## Example usage
 
+Run your program unflatpaked
+
 ```rust
 // src/main.rs
 fn main() -> Result<(), MyError> {
@@ -35,7 +37,21 @@ fn main() -> Result<(), MyError> {
     }
     // Unsandboxed functionality here...
 }
+```
 
+Run another program unflatpaked
+```rust
+// src/main.rs
+fn main() -> Result<(), MyError> {
+    // Sandboxed functionality
+    // Ensure this other program ran
+    if !flatpak_unsandbox::unsandbox(Some(Program::new(
+        "/libexec/my-agent-program", None)
+        ))? {
+        return Ok(())
+    }
+    // More sandboxed functionality here...
+}
 ```
 
 ## Contributing
