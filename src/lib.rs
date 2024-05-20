@@ -69,12 +69,11 @@ fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
         &data.load_bytes(gio::Cancellable::current().as_ref())?.0,
         KeyFileFlags::empty(),
     )?;
-    Ok(Path::new(
-        &flatpak_info
-            .string("Instance", "app-path")?
-            .to_string(),
-    )
-    .join(app_dir))
+    log::debug!(
+        "Path of instance: {:?}",
+        flatpak_info.string("Instance", "app-path")?
+    );
+    Ok(Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(app_dir))
 }
 
 fn is_flatpaked() -> bool {
