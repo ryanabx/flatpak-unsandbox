@@ -50,6 +50,8 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
     } else {
         return Ok(false);
     };
+    log::debug!("Got program: {:?}", program);
+    log::debug!("Effective program directory on host: {:?}", program_dir);
     let args = program.args;
     // Run program. This will halt execution on the main thread.
     let _ = Command::new("flatpak-spawn")

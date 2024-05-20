@@ -13,4 +13,5 @@ readme = "README.md"
 [dependencies]
 gio = "^0.19"
 glib = "^0.19"
+log = "0.4.21"
 thiserror = "^1"
