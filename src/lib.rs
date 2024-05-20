@@ -73,7 +73,15 @@ fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
         "Path of instance: {:?}",
         flatpak_info.string("Instance", "app-path")?
     );
-    Ok(Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(app_dir))
+    Ok(
+        Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(
+            if app_dir.is_absolute() {
+                app_dir.strip_prefix("/").unwrap()
+            } else {
+                app_dir
+            },
+        ),
+    )
 }
 
 fn is_flatpaked() -> bool {
