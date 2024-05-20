@@ -30,7 +30,7 @@ This rust crate allows rust flatpak apps to run themselves outside of the sandbo
 ```rust
 // src/main.rs
 fn main() -> Result<(), MyError> {
-    if flatpak_unsandbox::unsandbox(None) {
+    if flatpak_unsandbox::unsandbox(None)? {
         return Ok(())
     }
     // Unsandboxed functionality here...
