@@ -45,14 +45,31 @@ impl Default for Program {
 /// Returns `true` if the program was executed by this function, `false` otherwise.
 pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
     let program = program.unwrap_or_default();
-    let program_dir = if is_flatpaked() {
-        get_flatpak_app_dir(&program.path)?
+    let base_dir = if is_flatpaked() {
+        get_flatpak_base_dir()?
     } else {
         return Ok(false);
     };
+    let app_dir = &program.path;
+    let program_dir = base_dir.join(if app_dir.is_absolute() {
+        app_dir.strip_prefix("/app").unwrap()
+    } else {
+        app_dir.strip_prefix("app").unwrap()
+    });
     log::debug!("Got program: {:?}", program);
-    log::debug!("Effective program directory on host: {:?}", program_dir);
-    let args = program.args;
+    log::debug!("Effective base directory on host: {:?}", program_dir);
+    let args = program
+        .args
+        .iter()
+        .map(|x| {
+            let y = Path::new(x);
+            if y.try_exists().is_ok_and(|v| v) {
+                base_dir.join(y).to_string_lossy().to_string()
+            } else {
+                x.into()
+            }
+        })
+        .collect::<Vec<_>>();
     // Run program. This will halt execution on the main thread.
     let _ = Command::new("flatpak-spawn")
         .arg("--host")
@@ -62,7 +79,7 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
     Ok(true)
 }
 
-fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
+fn get_flatpak_base_dir() -> Result<PathBuf, glib::Error> {
     let flatpak_info = KeyFile::new();
     let data = gio::File::for_path("/.flatpak-info");
     flatpak_info.load_from_bytes(
@@ -73,15 +90,7 @@ fn get_flatpak_app_dir(app_dir: &Path) -> Result<PathBuf, glib::Error> {
         "Path of instance: {:?}",
         flatpak_info.string("Instance", "app-path")?
     );
-    Ok(
-        Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(
-            if app_dir.is_absolute() {
-                app_dir.strip_prefix("/app").unwrap()
-            } else {
-                app_dir.strip_prefix("app").unwrap()
-            },
-        ),
-    )
+    Ok(Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).to_owned())
 }
 
 fn is_flatpaked() -> bool {
