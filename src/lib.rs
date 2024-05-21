@@ -44,12 +44,14 @@ impl Default for Program {
 /// > **NOTE:** You must have the permission `--talk-name=org.freedesktop.Flatpak` enabled
 /// Returns `true` if the program was executed by this function, `false` otherwise.
 pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
-    let program = program.unwrap_or_default();
     let base_dir = if is_flatpaked() {
         get_flatpak_base_dir()?
+    } else if program.is_some() {
+        Path::new("").into()
     } else {
         return Ok(false);
     };
+    let program = program.unwrap_or_default();
     let app_dir = &program.path;
     let program_dir = base_dir.join(if app_dir.is_absolute() {
         app_dir.strip_prefix("/app").unwrap()
