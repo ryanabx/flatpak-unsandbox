@@ -40,6 +40,7 @@ fn main() -> Result<(), MyError> {
 ```
 
 Run another program unflatpaked
+
 ```rust
 // src/main.rs
 fn main() -> Result<(), MyError> {

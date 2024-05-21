@@ -9,6 +9,7 @@ keywords = ["flatpak", "sandbox"]
 repository = "https://github.com/ryanabx/flatpak-unsandbox"
 description = "Run your flatpak app outside of the sandbox."
 readme = "README.md"
+homepage = "https://ryanabx.github.io/flatpak-unsandbox"
 
 [dependencies]
 gio = "^0.19"
