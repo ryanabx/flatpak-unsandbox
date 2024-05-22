@@ -16,14 +16,44 @@ pub enum UnsandboxError {
     GlibError(#[from] glib::Error),
 }
 
+#[derive(Debug, Clone)]
+pub enum ProgramArg {
+    Value(String),
+    Path { path: PathBuf, in_sandbox: bool },
+}
+
 #[derive(Clone, Debug)]
 pub struct Program {
     pub path: PathBuf,
-    pub args: Vec<String>,
+    pub args: Vec<ProgramArg>,
+}
+
+impl From<ProgramArg> for String {
+    fn from(value: ProgramArg) -> Self {
+        match value {
+            ProgramArg::Value(val) => val,
+            ProgramArg::Path { path, in_sandbox } => {
+                if in_sandbox && is_flatpaked() {
+                    path_as_unsandboxed(&path)
+                        .unwrap()
+                        .to_string_lossy()
+                        .to_string()
+                } else {
+                    path.to_string_lossy().to_string()
+                }
+            }
+        }
+    }
+}
+
+impl From<String> for ProgramArg {
+    fn from(value: String) -> Self {
+        Self::Value(value)
+    }
 }
 
 impl Program {
-    pub fn new(file: impl Into<PathBuf>, args: Option<Vec<String>>) -> Self {
+    pub fn new(file: impl Into<PathBuf>, args: Option<Vec<ProgramArg>>) -> Self {
         Program {
             path: file.into(),
             args: args.unwrap_or_default(),
@@ -35,7 +65,10 @@ impl Default for Program {
     fn default() -> Self {
         Self {
             path: env::current_exe().unwrap(),
-            args: env::args().skip(1).collect::<Vec<_>>(),
+            args: env::args()
+                .skip(1)
+                .map(|x| x.into())
+                .collect::<Vec<ProgramArg>>(),
         }
     }
 }
@@ -63,14 +96,7 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
     let args = program
         .args
         .iter()
-        .map(|x| {
-            let y = Path::new(x);
-            if y.try_exists().is_ok_and(|v| v) {
-                base_dir.join(y).to_string_lossy().to_string()
-            } else {
-                x.into()
-            }
-        })
+        .map(|x| String::from(x.clone()))
         .collect::<Vec<_>>();
     // Run program. This will halt execution on the main thread.
     let _ = Command::new("flatpak-spawn")
@@ -79,6 +105,28 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
         .args(args)
         .status()?;
     Ok(true)
+}
+
+fn path_as_unsandboxed(path: &Path) -> Result<PathBuf, glib::Error> {
+    let flatpak_info = KeyFile::new();
+    let data = gio::File::for_path("/.flatpak-info");
+    flatpak_info.load_from_bytes(
+        &data.load_bytes(gio::Cancellable::current().as_ref())?.0,
+        KeyFileFlags::empty(),
+    )?;
+    log::debug!(
+        "Path of instance: {:?}",
+        flatpak_info.string("Instance", "app-path")?
+    );
+    Ok(
+        Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(
+            if path.is_absolute() {
+                path.strip_prefix("/app").unwrap()
+            } else {
+                path.strip_prefix("app").unwrap()
+            },
+        ),
+    )
 }
 
 fn get_flatpak_base_dir() -> Result<PathBuf, glib::Error> {
