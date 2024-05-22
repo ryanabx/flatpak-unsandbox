@@ -1,5 +1,6 @@
 use std::{
     env, io,
+    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -84,9 +85,9 @@ impl Default for Program {
 /// If no other program is specified, and the app is outside the sandbox, returns `false`
 /// > **NOTE:** You must have the permission `--talk-name=org.freedesktop.Flatpak` enabled
 /// Returns `true` if the program was executed by this function, `false` otherwise.
-pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
+pub fn unsandbox(program: Option<Program>) -> Result<Option<Command>, UnsandboxError> {
     if !is_flatpaked() && program.is_none() {
-        return Ok(false);
+        return Ok(None);
     }
     let program = program.unwrap_or_default();
     let program_dir = if is_flatpaked() {
@@ -110,17 +111,16 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
             format!("{:?} {:?}", program_dir, args)
         }
     );
-    let _ = if is_flatpaked() {
-        Command::new("flatpak-spawn")
-            .arg("--host")
-            .arg(program_dir)
-            .args(args)
-            .envs(envs)
-            .status()?
+    let cmd = if is_flatpaked() {
+        let mut c = Command::new("flatpak-spawn");
+        c.arg("--host").arg(program_dir).args(args).envs(envs);
+        c
     } else {
-        Command::new(program_dir).args(args).envs(envs).status()?
+        let mut c = Command::new(program_dir);
+        c.args(args).envs(envs);
+        c
     };
-    Ok(true)
+    Ok(Some(cmd))
 }
 
 fn path_as_unsandboxed(path: &Path) -> Result<PathBuf, glib::Error> {
