@@ -26,6 +26,7 @@ pub enum ProgramArg {
 pub struct Program {
     pub path: PathBuf,
     pub args: Vec<ProgramArg>,
+    pub envs: Vec<(String, String)>,
 }
 
 impl From<ProgramArg> for String {
@@ -53,10 +54,15 @@ impl From<String> for ProgramArg {
 }
 
 impl Program {
-    pub fn new(file: impl Into<PathBuf>, args: Option<Vec<ProgramArg>>) -> Self {
+    pub fn new(
+        file: impl Into<PathBuf>,
+        args: Option<Vec<ProgramArg>>,
+        envs: Option<Vec<(String, String)>>,
+    ) -> Self {
         Program {
             path: file.into(),
             args: args.unwrap_or_default(),
+            envs: envs.unwrap_or_default(),
         }
     }
 }
@@ -69,6 +75,7 @@ impl Default for Program {
                 .skip(1)
                 .map(|x| x.into())
                 .collect::<Vec<ProgramArg>>(),
+            envs: env::vars().collect::<Vec<_>>(),
         }
     }
 }
@@ -93,6 +100,7 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
         .iter()
         .map(|x| String::from(x.clone()))
         .collect::<Vec<_>>();
+    let envs = program.envs;
     // Run program. This will halt execution on the main thread.
     log::info!(
         "Command: '{}'",
@@ -107,9 +115,10 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
             .arg("--host")
             .arg(program_dir)
             .args(args)
+            .envs(envs)
             .status()?
     } else {
-        Command::new(program_dir).args(args).status()?
+        Command::new(program_dir).args(args).envs(envs).status()?
     };
     Ok(true)
 }
