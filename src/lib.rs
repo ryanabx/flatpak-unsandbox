@@ -137,9 +137,21 @@ fn path_as_unsandboxed(path: &Path) -> Result<PathBuf, glib::Error> {
     Ok(
         Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(
             if path.is_absolute() {
-                path.strip_prefix("/app").unwrap()
+                path.strip_prefix("/app").unwrap_or_else(|_| {
+                    log::warn!(
+                        "Path {:?} did not have prefix '/app', using full path instead",
+                        path
+                    );
+                    path
+                })
             } else {
-                path.strip_prefix("app").unwrap()
+                path.strip_prefix("app").unwrap_or_else(|_| {
+                    log::warn!(
+                        "Path {:?} did not have prefix 'app', using full path instead",
+                        path
+                    );
+                    path
+                })
             },
         ),
     )
