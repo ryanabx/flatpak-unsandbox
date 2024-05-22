@@ -74,6 +74,7 @@ impl Default for Program {
 }
 
 /// Runs this program, or an optional `program` outside of the flatpak sandbox.
+/// If no other program is specified, and the app is outside the sandbox, returns `false`
 /// > **NOTE:** You must have the permission `--talk-name=org.freedesktop.Flatpak` enabled
 /// Returns `true` if the program was executed by this function, `false` otherwise.
 pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
@@ -93,11 +94,15 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
         .map(|x| String::from(x.clone()))
         .collect::<Vec<_>>();
     // Run program. This will halt execution on the main thread.
-    let _ = Command::new("flatpak-spawn")
-        .arg("--host")
-        .arg(program_dir)
-        .args(args)
-        .status()?;
+    let _ = if is_flatpaked() {
+        Command::new("flatpak-spawn")
+            .arg("--host")
+            .arg(program_dir)
+            .args(args)
+            .status()?
+    } else {
+        Command::new(program_dir).args(args).status()?
+    };
     Ok(true)
 }
 
