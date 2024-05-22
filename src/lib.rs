@@ -94,6 +94,14 @@ pub fn unsandbox(program: Option<Program>) -> Result<bool, UnsandboxError> {
         .map(|x| String::from(x.clone()))
         .collect::<Vec<_>>();
     // Run program. This will halt execution on the main thread.
+    log::info!(
+        "Command: '{}'",
+        if is_flatpaked() {
+            format!("flatpak-spawn --host {:?} {:?}", program_dir, args)
+        } else {
+            format!("{:?} {:?}", program_dir, args)
+        }
+    );
     let _ = if is_flatpaked() {
         Command::new("flatpak-spawn")
             .arg("--host")
