@@ -12,7 +12,7 @@ readme = "README.md"
 homepage = "https://ryanabx.github.io/flatpak-unsandbox"
 
 [dependencies]
-gio = "^0.19"
-glib = "^0.19"
+configparser = "3.0.4"
 log = "0.4.21"
 thiserror = "^1"
+zbus = { version = "4.2.2", features = ["blocking"], default-features = false }
