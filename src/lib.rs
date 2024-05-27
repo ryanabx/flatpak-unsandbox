@@ -72,6 +72,8 @@ impl FlatpakInfo {
     pub fn new() -> Result<FlatpakInfo, UnsandboxError> {
         if !is_flatpaked() {
             return Err(UnsandboxError::NotSandboxed);
+        } else if !has_flatpak_spawn_permission().is_ok_and(|x| x) {
+            return Err(UnsandboxError::NoPermissions);
         }
         let mut config = configparser::ini::Ini::new();
         if let Err(_) = config.read(read_to_string("./flatpak-info")?) {
@@ -126,11 +128,6 @@ impl FlatpakInfo {
         envs: Option<Vec<(String, CmdArg)>>,
         cwd: Option<PathBuf>,
     ) -> Result<Command, UnsandboxError> {
-        if !is_flatpaked() {
-            return Err(UnsandboxError::NotSandboxed);
-        } else if !has_flatpak_spawn_permission().is_ok_and(|x| x) {
-            return Err(UnsandboxError::NoPermissions);
-        }
         let lib_paths = self
             .get_all_lib_paths()?
             .iter()
