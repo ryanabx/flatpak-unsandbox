@@ -1,176 +1,176 @@
 use std::{
-    env, io,
-    ops::{Deref, DerefMut},
+    fs::read_to_string,
+    io,
     path::{Path, PathBuf},
     process::Command,
+    string::FromUtf8Error,
 };
-
-use gio::prelude::FileExt;
-use glib::{KeyFile, KeyFileFlags};
 use thiserror::Error;
+use zbus::blocking::fdo::PeerProxy;
+use zbus::blocking::Connection;
 
 #[derive(Error, Debug)]
 pub enum UnsandboxError {
-    #[error("Program failed `{0}`")]
-    ExecutionError(#[from] io::Error),
-    #[error("Glib had a problem `{0}`")]
-    GlibError(#[from] glib::Error),
-}
-
-#[derive(Debug, Clone)]
-pub enum ProgramArg {
-    Value(String),
-    Path { path: PathBuf, in_sandbox: bool },
+    #[error("IO: `{0}`")]
+    IO(#[from] io::Error),
+    #[error("The program is not sandboxed.")]
+    NotSandboxed,
+    #[error("LD not found.")]
+    LdNotFound,
+    #[error("Failed to convert utf8 string `{0}`")]
+    FailedFromUtf8(#[from] FromUtf8Error),
+    #[error("Failed to read config")]
+    ConfigReadError,
+    #[error("Zbus: `{0}`")]
+    ZbusError(#[from] zbus::Error),
+    #[error("No --talk-name=org.freedesktop.Flatpak permission for this Flatpak")]
+    NoPermissions,
 }
 
 #[derive(Clone, Debug)]
-pub struct Program {
-    pub path: PathBuf,
-    pub args: Vec<ProgramArg>,
-    pub envs: Vec<(String, String)>,
+pub enum CmdArg {
+    StringArg(String),
+    PathArg(PathBuf),
 }
 
-impl From<ProgramArg> for String {
-    fn from(value: ProgramArg) -> Self {
-        match value {
-            ProgramArg::Value(val) => val,
-            ProgramArg::Path { path, in_sandbox } => {
-                if in_sandbox && is_flatpaked() {
-                    path_as_unsandboxed(&path)
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string()
-                } else {
-                    path.to_string_lossy().to_string()
-                }
+impl From<String> for CmdArg {
+    fn from(value: String) -> Self {
+        Self::StringArg(value)
+    }
+}
+
+impl From<PathBuf> for CmdArg {
+    fn from(value: PathBuf) -> Self {
+        Self::PathArg(value)
+    }
+}
+
+impl CmdArg {
+    pub fn new_path(p: impl Into<PathBuf>) -> Self {
+        Self::PathArg(p.into())
+    }
+
+    pub fn new_string(s: impl Into<String>) -> Self {
+        Self::StringArg(s.into())
+    }
+
+    pub fn into_string(&self, flatpak: FlatpakInfo) -> String {
+        match self {
+            Self::PathArg(pth) => flatpak.to_host_path(pth).to_string_lossy().to_string(),
+            Self::StringArg(s) => s.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FlatpakInfo {
+    app_path: PathBuf,
+    runtime_path: PathBuf,
+}
+
+impl FlatpakInfo {
+    pub fn new() -> Result<FlatpakInfo, UnsandboxError> {
+        if !is_flatpaked() {
+            return Err(UnsandboxError::NotSandboxed);
+        }
+        let mut config = configparser::ini::Ini::new();
+        if let Err(_) = config.read(read_to_string("./flatpak-info")?) {
+            return Err(UnsandboxError::ConfigReadError);
+        }
+        Ok(FlatpakInfo {
+            app_path: Path::new(&config.get("Instance", "app-path").unwrap()).to_path_buf(),
+            runtime_path: Path::new(&config.get("Instance", "runtime-path").unwrap()).to_path_buf(),
+        })
+    }
+
+    pub fn to_host_path(&self, path: impl Into<PathBuf>) -> PathBuf {
+        let path: PathBuf = path.into();
+        if path.starts_with("/app") {
+            self.app_path.join(path.strip_prefix("/app").unwrap())
+        } else if path.starts_with("/usr") {
+            self.runtime_path.join(path.strip_prefix("/usr").unwrap())
+        } else {
+            path
+        }
+    }
+
+    pub fn get_ld_path(&self) -> Result<PathBuf, UnsandboxError> {
+        let out = Command::new("ldconfig").arg("-p").output()?;
+        for l in String::from_utf8(out.stdout)?.lines() {
+            if l.trim().starts_with("ld-linux") {
+                return Ok(self.to_host_path(l.split(" => ").nth(1).unwrap().trim()));
             }
         }
+        Err(UnsandboxError::LdNotFound)
     }
-}
 
-impl From<String> for ProgramArg {
-    fn from(value: String) -> Self {
-        Self::Value(value)
+    pub fn get_all_lib_paths(&self) -> Result<Vec<PathBuf>, UnsandboxError> {
+        let out = Command::new("ldconfig").arg("-v").output()?;
+
+        Ok(String::from_utf8(out.stdout)?
+            .lines()
+            .filter_map(|l| {
+                if l.starts_with("\t") {
+                    None
+                } else {
+                    Some(self.to_host_path(l.split(":").next().unwrap()))
+                }
+            })
+            .collect::<Vec<_>>())
     }
-}
 
-impl Program {
-    pub fn new(
-        file: impl Into<PathBuf>,
-        args: Option<Vec<ProgramArg>>,
-        envs: Option<Vec<(String, String)>>,
-    ) -> Self {
-        Program {
-            path: file.into(),
-            args: args.unwrap_or_default(),
-            envs: envs.unwrap_or_default(),
+    /// run a command unsandboxed. make sure to wrap paths in `FlatpakInfo::to_host_path()`
+    pub fn run_unsandboxed(
+        &self,
+        command: Vec<CmdArg>,
+        envs: Option<Vec<(String, CmdArg)>>,
+        cwd: Option<PathBuf>,
+    ) -> Result<Command, UnsandboxError> {
+        if !is_flatpaked() {
+            return Err(UnsandboxError::NotSandboxed);
+        } else if !has_flatpak_spawn_permission().is_ok_and(|x| x) {
+            return Err(UnsandboxError::NoPermissions);
         }
-    }
-}
-
-impl Default for Program {
-    fn default() -> Self {
-        Self {
-            path: env::current_exe().unwrap(),
-            args: env::args()
-                .skip(1)
-                .map(|x| x.into())
-                .collect::<Vec<ProgramArg>>(),
-            envs: env::vars().collect::<Vec<_>>(),
+        let lib_paths = self
+            .get_all_lib_paths()?
+            .iter()
+            .map(|x| x.to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join(":");
+        let ld_path = self.get_ld_path()?;
+        let mut cmd = Command::new("flatpak-spawn");
+        cmd.arg("--host");
+        cmd.arg(ld_path).arg("--library-path").arg(&lib_paths);
+        cmd.args(command.iter().map(|x| x.into_string(self.clone())));
+        if envs.is_some() {
+            cmd.envs(
+                envs.unwrap()
+                    .iter()
+                    .map(|x| (x.0.clone(), x.1.into_string(self.clone()))),
+            );
         }
-    }
-}
-
-/// Runs this program, or an optional `program` outside of the flatpak sandbox.
-/// If no other program is specified, and the app is outside the sandbox, returns `false`
-/// > **NOTE:** You must have the permission `--talk-name=org.freedesktop.Flatpak` enabled
-/// Returns `true` if the program was executed by this function, `false` otherwise.
-pub fn unsandbox(program: Option<Program>) -> Result<Option<Command>, UnsandboxError> {
-    if !is_flatpaked() && program.is_none() {
-        return Ok(None);
-    }
-    let program = program.unwrap_or_default();
-    let program_dir = if is_flatpaked() {
-        path_as_unsandboxed(&program.path)?
-    } else {
-        program.path.to_path_buf()
-    };
-    log::debug!("Got program: {:?}", program);
-    let args = program
-        .args
-        .iter()
-        .map(|x| String::from(x.clone()))
-        .collect::<Vec<_>>();
-    let envs = program.envs;
-    // Run program. This will halt execution on the main thread.
-    log::info!(
-        "Command: '{}'",
-        if is_flatpaked() {
-            format!("flatpak-spawn --host {:?} {:?}", program_dir, args)
-        } else {
-            format!("{:?} {:?}", program_dir, args)
+        cmd.env("LD_LIBRARY_PATH", &lib_paths);
+        if let Some(wd) = cwd {
+            cmd.current_dir(CmdArg::new_path(wd).into_string(self.clone()));
         }
-    );
-    let cmd = if is_flatpaked() {
-        let mut c = Command::new("flatpak-spawn");
-        c.arg("--host").arg(program_dir).args(args).envs(envs);
-        c
-    } else {
-        let mut c = Command::new(program_dir);
-        c.args(args).envs(envs);
-        c
-    };
-    Ok(Some(cmd))
+        Ok(cmd)
+    }
 }
 
-fn path_as_unsandboxed(path: &Path) -> Result<PathBuf, glib::Error> {
-    let flatpak_info = KeyFile::new();
-    let data = gio::File::for_path("/.flatpak-info");
-    flatpak_info.load_from_bytes(
-        &data.load_bytes(gio::Cancellable::current().as_ref())?.0,
-        KeyFileFlags::empty(),
-    )?;
-    log::debug!(
-        "Path of instance: {:?}",
-        flatpak_info.string("Instance", "app-path")?
-    );
-    Ok(
-        Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).join(
-            if path.is_absolute() {
-                path.strip_prefix("/app").unwrap_or_else(|_| {
-                    log::warn!(
-                        "Path {:?} did not have prefix '/app', using full path instead",
-                        path
-                    );
-                    path
-                })
-            } else {
-                path.strip_prefix("app").unwrap_or_else(|_| {
-                    log::warn!(
-                        "Path {:?} did not have prefix 'app', using full path instead",
-                        path
-                    );
-                    path
-                })
-            },
-        ),
-    )
-}
-
-fn get_flatpak_base_dir() -> Result<PathBuf, glib::Error> {
-    let flatpak_info = KeyFile::new();
-    let data = gio::File::for_path("/.flatpak-info");
-    flatpak_info.load_from_bytes(
-        &data.load_bytes(gio::Cancellable::current().as_ref())?.0,
-        KeyFileFlags::empty(),
-    )?;
-    log::debug!(
-        "Path of instance: {:?}",
-        flatpak_info.string("Instance", "app-path")?
-    );
-    Ok(Path::new(&flatpak_info.string("Instance", "app-path")?.to_string()).to_owned())
-}
-
-fn is_flatpaked() -> bool {
+pub fn is_flatpaked() -> bool {
     Path::new("/.flatpak-info").exists()
+}
+
+pub fn has_flatpak_spawn_permission() -> Result<bool, UnsandboxError> {
+    let connection = Connection::session()?;
+    let pr = PeerProxy::new(
+        &connection,
+        "org.freedesktop.Flatpak",
+        "/org/freedesktop/Flatpak/Development",
+    )?;
+    if let Err(_) = pr.ping() {
+        Ok(false)
+    } else {
+        Ok(true)
+    }
 }
