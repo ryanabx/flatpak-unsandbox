@@ -33,28 +33,16 @@ pub enum CmdArg {
     PathArg(PathBuf),
 }
 
-impl From<String> for CmdArg {
-    fn from(value: String) -> Self {
-        Self::StringArg(value)
-    }
-}
-
-impl From<PathBuf> for CmdArg {
-    fn from(value: PathBuf) -> Self {
-        Self::PathArg(value)
-    }
-}
-
 impl CmdArg {
-    pub fn new_path(p: impl Into<PathBuf>) -> Self {
-        Self::PathArg(p.into())
+    pub fn new_path<P: AsRef<Path>>(p: P) -> Self {
+        Self::PathArg(p.as_ref().into())
     }
 
-    pub fn new_string(s: impl Into<String>) -> Self {
+    pub fn new_string(s: String) -> Self {
         Self::StringArg(s.into())
     }
 
-    pub fn into_string(&self, flatpak: FlatpakInfo) -> String {
+    fn into_string(&self, flatpak: FlatpakInfo) -> String {
         match self {
             Self::PathArg(pth) => flatpak.to_host_path(pth).to_string_lossy().to_string(),
             Self::StringArg(s) => s.clone(),

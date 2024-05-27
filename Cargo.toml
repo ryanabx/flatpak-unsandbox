@@ -1,6 +1,6 @@
 [package]
 name = "flatpak-unsandbox"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Ryan Brue <ryanbrue@gmail.com>"]
 license = "MIT"
@@ -15,4 +15,4 @@ homepage = "https://ryanabx.github.io/flatpak-unsandbox"
 configparser = "3.0.4"
 log = "0.4.21"
 thiserror = "^1"
-zbus = { version = "4.2.2", features = ["blocking"], default-features = false }
+zbus = { version = "4.2.2", features = ["blocking"] }
