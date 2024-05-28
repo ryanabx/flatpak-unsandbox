@@ -1,4 +1,5 @@
 use std::{
+    env,
     fs::read_to_string,
     io,
     path::{Path, PathBuf},
@@ -40,6 +41,14 @@ impl CmdArg {
 
     pub fn new_string(s: String) -> Self {
         Self::StringArg(s.into())
+    }
+
+    pub fn new_guess(s: String) -> Self {
+        if Path::new(&s).exists() {
+            Self::PathArg(s.into())
+        } else {
+            Self::StringArg(s)
+        }
     }
 
     fn into_string(&self, flatpak: FlatpakInfo) -> String {
@@ -129,6 +138,7 @@ impl FlatpakInfo {
         command: Vec<CmdArg>,
         envs: Option<Vec<(String, CmdArg)>>,
         cwd: Option<PathBuf>,
+        options: UnsandboxOptions,
     ) -> Result<Command, UnsandboxError> {
         let command = command
             .iter()
@@ -152,6 +162,17 @@ impl FlatpakInfo {
         let ld_path = self.get_ld_path()?;
         log::debug!("ld_path: {:?}", ld_path);
         let mut cmd = Command::new("flatpak-spawn");
+        if options.attempt_env_translation {
+            let other_envs = env::vars()
+                .map(|(e, val)| (e, CmdArg::new_guess(val).into_string(self.clone())))
+                .collect::<Vec<_>>();
+            log::debug!(
+                "Attempting env translation: {:?} to {:?}",
+                other_envs,
+                env::vars().collect::<Vec<_>>()
+            );
+            cmd.envs(other_envs);
+        }
         cmd.arg("--host");
         cmd.arg(ld_path).arg("--library-path").arg(&lib_paths);
         cmd.args(command);
@@ -171,6 +192,11 @@ impl FlatpakInfo {
         );
         Ok(cmd)
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct UnsandboxOptions {
+    pub attempt_env_translation: bool,
 }
 
 pub fn is_flatpaked() -> bool {
