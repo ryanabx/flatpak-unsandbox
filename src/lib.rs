@@ -148,7 +148,9 @@ impl FlatpakInfo {
             .map(|x| x.to_string_lossy().to_string())
             .collect::<Vec<_>>()
             .join(":");
+        log::debug!("lib_paths: {:?}", lib_paths);
         let ld_path = self.get_ld_path()?;
+        log::debug!("ld_path: {:?}", ld_path);
         let mut cmd = Command::new("flatpak-spawn");
         cmd.arg("--host");
         cmd.arg(ld_path).arg("--library-path").arg(&lib_paths);
@@ -160,6 +162,13 @@ impl FlatpakInfo {
         if let Some(wd) = cwd {
             cmd.current_dir(CmdArg::new_path(wd).into_string(self.clone()));
         }
+        log::debug!(
+            "{:?} {:?} {:?} {:?}",
+            cmd.get_program(),
+            cmd.get_args(),
+            cmd.get_envs(),
+            cmd.get_current_dir()
+        );
         Ok(cmd)
     }
 }
