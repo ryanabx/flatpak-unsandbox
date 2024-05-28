@@ -67,8 +67,9 @@ impl FlatpakInfo {
             );
             return Err(UnsandboxError::NoPermissions);
         }
+        log::info!("Sandbox passed checks!");
         let mut config = configparser::ini::Ini::new();
-        if let Err(_) = config.read(read_to_string("./flatpak-info")?) {
+        if let Err(_) = config.read(read_to_string("/.flatpak-info")?) {
             log::error!("Could not read flatpak-info config");
             return Err(UnsandboxError::ConfigReadError);
         }
