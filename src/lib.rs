@@ -32,6 +32,7 @@ pub enum UnsandboxError {
 pub enum CmdArg {
     StringArg(String),
     PathArg(PathBuf),
+    PathDelimArg(Vec<PathBuf>, String),
 }
 
 impl CmdArg {
@@ -47,6 +48,22 @@ impl CmdArg {
         if Path::new(&s).exists() {
             Self::PathArg(s.into())
         } else {
+            for delim in [":", ","] {
+                let x = s
+                    .split(delim)
+                    .map(|p| Path::new(p).to_path_buf())
+                    .collect::<Vec<_>>();
+                let mut all_exists = true;
+                for pth in x.clone() {
+                    if !pth.exists() {
+                        all_exists = false;
+                        break;
+                    }
+                }
+                if all_exists {
+                    return Self::PathDelimArg(x, delim.into());
+                }
+            }
             Self::StringArg(s)
         }
     }
@@ -55,6 +72,11 @@ impl CmdArg {
         match self {
             Self::PathArg(pth) => flatpak.to_host_path(pth).to_string_lossy().to_string(),
             Self::StringArg(s) => s.clone(),
+            Self::PathDelimArg(p, delim) => p
+                .iter()
+                .map(|x| flatpak.to_host_path(x).to_string_lossy().to_string())
+                .collect::<Vec<_>>()
+                .join(delim),
         }
     }
 }
