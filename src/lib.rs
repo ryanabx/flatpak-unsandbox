@@ -59,17 +59,30 @@ pub struct FlatpakInfo {
 impl FlatpakInfo {
     pub fn new() -> Result<FlatpakInfo, UnsandboxError> {
         if !is_flatpaked() {
+            log::error!("This instance is not sandboxed!");
             return Err(UnsandboxError::NotSandboxed);
         } else if !has_flatpak_spawn_permission().is_ok_and(|x| x) {
+            log::error!(
+                "This instance does not have the --talk-name=org.freedesktop.Flatpak permission!"
+            );
             return Err(UnsandboxError::NoPermissions);
         }
         let mut config = configparser::ini::Ini::new();
         if let Err(_) = config.read(read_to_string("./flatpak-info")?) {
+            log::error!("Could not read flatpak-info config");
             return Err(UnsandboxError::ConfigReadError);
         }
+        let app_path = Path::new(&config.get("Instance", "app-path").unwrap()).to_path_buf();
+        let runtime_path =
+            Path::new(&config.get("Instance", "runtime-path").unwrap()).to_path_buf();
+        log::debug!(
+            "app_path: {}, runtime_path: {}",
+            &app_path.to_string_lossy(),
+            &runtime_path.to_string_lossy()
+        );
         Ok(FlatpakInfo {
-            app_path: Path::new(&config.get("Instance", "app-path").unwrap()).to_path_buf(),
-            runtime_path: Path::new(&config.get("Instance", "runtime-path").unwrap()).to_path_buf(),
+            app_path,
+            runtime_path,
         })
     }
 
@@ -116,6 +129,18 @@ impl FlatpakInfo {
         envs: Option<Vec<(String, CmdArg)>>,
         cwd: Option<PathBuf>,
     ) -> Result<Command, UnsandboxError> {
+        let command = command
+            .iter()
+            .map(|x| x.into_string(self.clone()))
+            .collect::<Vec<_>>();
+        let envs = envs.map(|e| {
+            e.iter()
+                .map(|x| (x.0.clone(), x.1.into_string(self.clone())))
+                .collect::<Vec<_>>()
+        });
+        log::debug!("Received command: {:?}", command);
+        log::debug!("Received envs: {:?}", envs);
+        log::debug!("Received cwd: {:?}", cwd);
         let lib_paths = self
             .get_all_lib_paths()?
             .iter()
@@ -126,13 +151,9 @@ impl FlatpakInfo {
         let mut cmd = Command::new("flatpak-spawn");
         cmd.arg("--host");
         cmd.arg(ld_path).arg("--library-path").arg(&lib_paths);
-        cmd.args(command.iter().map(|x| x.into_string(self.clone())));
+        cmd.args(command);
         if envs.is_some() {
-            cmd.envs(
-                envs.unwrap()
-                    .iter()
-                    .map(|x| (x.0.clone(), x.1.into_string(self.clone()))),
-            );
+            cmd.envs(envs.unwrap());
         }
         cmd.env("LD_LIBRARY_PATH", &lib_paths);
         if let Some(wd) = cwd {
