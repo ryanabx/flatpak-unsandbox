@@ -184,6 +184,9 @@ impl FlatpakInfo {
         let ld_path = self.get_ld_path()?;
         log::debug!("ld_path: {:?}", ld_path);
         let mut cmd = Command::new("flatpak-spawn");
+        if options.clear_env {
+            cmd.env_clear();
+        }
         if options.attempt_env_translation {
             let other_envs = env::vars()
                 .map(|(e, val)| (e, CmdArg::new_guess(val).into_string(self.clone())))
@@ -219,6 +222,7 @@ impl FlatpakInfo {
 #[derive(Clone, Debug)]
 pub struct UnsandboxOptions {
     pub attempt_env_translation: bool,
+    pub clear_env: bool
 }
 
 pub fn is_flatpaked() -> bool {
