@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     env,
     fs::read_to_string,
     io,
@@ -57,15 +58,10 @@ impl CmdArg {
                     .split(delim)
                     .map(|p| Path::new(p.trim()).to_path_buf())
                     .collect::<Vec<_>>();
-                let mut all_exists = true;
                 for pth in x.clone() {
-                    if !pth.exists() {
-                        all_exists = false;
-                        break;
+                    if pth.exists() {
+                        return Self::PathDelimArg(x, delim.into());
                     }
-                }
-                if all_exists {
-                    return Self::PathDelimArg(x, delim.into());
                 }
             }
             Self::StringArg(s)
