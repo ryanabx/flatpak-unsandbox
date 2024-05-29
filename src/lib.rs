@@ -187,7 +187,7 @@ impl FlatpakInfo {
         if options.clear_env {
             cmd.env_clear();
         }
-        if options.attempt_env_translation {
+        if options.translate_env {
             let other_envs = env::vars()
                 .map(|(e, val)| (e, CmdArg::new_guess(val).into_string(self.clone())))
                 .collect::<Vec<_>>();
@@ -221,8 +221,8 @@ impl FlatpakInfo {
 
 #[derive(Clone, Debug)]
 pub struct UnsandboxOptions {
-    pub attempt_env_translation: bool,
-    pub clear_env: bool
+    pub translate_env: bool,
+    pub clear_env: bool,
 }
 
 pub fn is_flatpaked() -> bool {
