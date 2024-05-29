@@ -40,6 +40,10 @@ impl CmdArg {
         Self::PathArg(p.as_ref().into())
     }
 
+    pub fn new_path_list(p: Vec<PathBuf>, delim: String) -> Self {
+        Self::PathDelimArg(p, delim)
+    }
+
     pub fn new_string(s: String) -> Self {
         Self::StringArg(s.into())
     }
@@ -174,12 +178,7 @@ impl FlatpakInfo {
         log::debug!("Received command: {:?}", command);
         log::debug!("Received envs: {:?}", envs);
         log::debug!("Received cwd: {:?}", cwd);
-        let lib_paths = self
-            .get_all_lib_paths()?
-            .iter()
-            .map(|x| x.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(":");
+        let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
         log::debug!("lib_paths: {:?}", lib_paths);
         let ld_path = self.get_ld_path()?;
         log::debug!("ld_path: {:?}", ld_path);
@@ -189,22 +188,28 @@ impl FlatpakInfo {
         }
         if options.translate_env {
             let other_envs = env::vars()
-                .map(|(e, val)| (e, CmdArg::new_guess(val).into_string(self.clone())))
+                .map(|(e, val)| (e, CmdArg::new_guess(val)))
                 .collect::<Vec<_>>();
             log::debug!(
                 "Attempting env translation: {:?} to {:?}",
+                env::vars().collect::<Vec<_>>(),
                 other_envs,
-                env::vars().collect::<Vec<_>>()
             );
-            cmd.envs(other_envs);
+            cmd.envs(
+                other_envs
+                    .iter()
+                    .map(|(e, v)| (e, v.into_string(self.clone()))),
+            );
         }
         cmd.arg("--host");
-        cmd.arg(ld_path).arg("--library-path").arg(&lib_paths);
+        cmd.arg(ld_path)
+            .arg("--library-path")
+            .arg(&lib_paths.into_string(self.clone()));
         cmd.args(command);
         if envs.is_some() {
             cmd.envs(envs.unwrap());
         }
-        cmd.env("LD_LIBRARY_PATH", &lib_paths);
+        cmd.env("LD_LIBRARY_PATH", &lib_paths.into_string(self.clone()));
         if let Some(wd) = cwd {
             cmd.current_dir(CmdArg::new_path(wd).into_string(self.clone()));
         }
