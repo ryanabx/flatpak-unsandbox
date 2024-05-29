@@ -51,7 +51,7 @@ impl CmdArg {
             for delim in [":", ","] {
                 let x = s
                     .split(delim)
-                    .map(|p| Path::new(p).to_path_buf())
+                    .map(|p| Path::new(p.trim()).to_path_buf())
                     .collect::<Vec<_>>();
                 let mut all_exists = true;
                 for pth in x.clone() {
