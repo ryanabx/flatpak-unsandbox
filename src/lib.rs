@@ -165,13 +165,13 @@ impl FlatpakInfo {
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
         let ld_path = self.get_ld_path()?;
         let mut cmd = Command::new("flatpak-spawn");
+        if let Some(cwd) = cwd {
+            cmd.current_dir(cwd);
+        }
         if options.clear_env {
             cmd.env_clear();
         }
         cmd.arg("--host");
-        cmd.arg(ld_path)
-            .arg("--library-path")
-            .arg(&lib_paths.into_string(self.clone()));
         cmd.arg("env").arg(format!(
             "LD_LIBRARY_PATH={}",
             lib_paths.into_string(self.clone())
@@ -182,6 +182,9 @@ impl FlatpakInfo {
         for (e, v) in envs {
             cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
         }
+        cmd.arg(ld_path)
+            .arg("--library-path")
+            .arg(&lib_paths.into_string(self.clone()));
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
         }
