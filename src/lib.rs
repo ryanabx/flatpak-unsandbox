@@ -180,7 +180,7 @@ impl FlatpakInfo {
         cmd.arg(ld_path)
             .arg("--library-path")
             .arg(&lib_paths.into_string(self.clone()));
-        cmd.args(command);
+        envs.insert("LD_LIBRARY_PATH".into(), lib_paths.clone());
         if !envs.is_empty() {
             cmd.arg(&format!(
                 "env {}",
@@ -190,17 +190,10 @@ impl FlatpakInfo {
                     .join(" ")
             ));
         }
-        cmd.env("LD_LIBRARY_PATH", &lib_paths.into_string(self.clone()));
+        cmd.args(command);
         if let Some(wd) = cwd {
             cmd.current_dir(CmdArg::new_path(wd).into_string(self.clone()));
         }
-        log::debug!(
-            "{:?} {:?} {:?} {:?}",
-            cmd.get_program(),
-            cmd.get_args(),
-            cmd.get_envs(),
-            cmd.get_current_dir()
-        );
         Ok(cmd)
     }
 }
