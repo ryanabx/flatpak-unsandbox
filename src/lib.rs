@@ -158,52 +158,37 @@ impl FlatpakInfo {
     pub fn run_unsandboxed(
         &self,
         command: Vec<CmdArg>,
-        envs: Option<Vec<(String, CmdArg)>>,
+        envs: HashMap<String, CmdArg>,
         cwd: Option<PathBuf>,
         options: UnsandboxOptions,
     ) -> Result<Command, UnsandboxError> {
+        let mut envs = envs.clone();
         let command = command
             .iter()
             .map(|x| x.into_string(self.clone()))
             .collect::<Vec<_>>();
-        let envs = envs.map(|e| {
-            e.iter()
-                .map(|x| (x.0.clone(), x.1.into_string(self.clone())))
-                .collect::<Vec<_>>()
-        });
-        log::debug!("Received command: {:?}", command);
-        log::debug!("Received envs: {:?}", envs);
-        log::debug!("Received cwd: {:?}", cwd);
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
-        log::debug!("lib_paths: {:?}", lib_paths);
         let ld_path = self.get_ld_path()?;
-        log::debug!("ld_path: {:?}", ld_path);
         let mut cmd = Command::new("flatpak-spawn");
         if options.clear_env {
             cmd.env_clear();
         }
         if options.translate_env {
-            let other_envs = env::vars()
-                .map(|(e, val)| (e, CmdArg::new_guess(val)))
-                .collect::<Vec<_>>();
-            log::debug!(
-                "Attempting env translation: {:?} to {:?}",
-                env::vars().collect::<Vec<_>>(),
-                other_envs,
-            );
-            cmd.envs(
-                other_envs
-                    .iter()
-                    .map(|(e, v)| (e, v.into_string(self.clone()))),
-            );
+            envs.extend(env::vars().map(|(e, v)| (e, CmdArg::new_guess(v))));
         }
         cmd.arg("--host");
         cmd.arg(ld_path)
             .arg("--library-path")
             .arg(&lib_paths.into_string(self.clone()));
         cmd.args(command);
-        if envs.is_some() {
-            cmd.envs(envs.unwrap());
+        if !envs.is_empty() {
+            cmd.arg(&format!(
+                "env {}",
+                envs.iter()
+                    .map(|(e, v)| format!("{}=\"{}\"", e, v.into_string(self.clone())))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ));
         }
         cmd.env("LD_LIBRARY_PATH", &lib_paths.into_string(self.clone()));
         if let Some(wd) = cwd {
