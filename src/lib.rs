@@ -183,7 +183,8 @@ impl FlatpakInfo {
         envs.insert("LD_LIBRARY_PATH".into(), lib_paths.clone());
         if !envs.is_empty() {
             cmd.arg(&format!(
-                "env {}",
+                "{} {}",
+                CmdArg::new_path("/usr/bin/env").into_string(self.clone()),
                 envs.iter()
                     .map(|(e, v)| format!("{}=\"{}\"", e, v.into_string(self.clone())))
                     .collect::<Vec<_>>()
