@@ -162,38 +162,28 @@ impl FlatpakInfo {
         cwd: Option<PathBuf>,
         options: UnsandboxOptions,
     ) -> Result<Command, UnsandboxError> {
-        let mut envs = envs.clone();
-        let command = command
-            .iter()
-            .map(|x| x.into_string(self.clone()))
-            .collect::<Vec<_>>();
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
         let ld_path = self.get_ld_path()?;
         let mut cmd = Command::new("flatpak-spawn");
         if options.clear_env {
             cmd.env_clear();
         }
-        if options.translate_env {
-            envs.extend(env::vars().map(|(e, v)| (e, CmdArg::new_guess(v))));
-        }
         cmd.arg("--host");
         cmd.arg(ld_path)
             .arg("--library-path")
             .arg(&lib_paths.into_string(self.clone()));
-        envs.insert("LD_LIBRARY_PATH".into(), lib_paths.clone());
-        if !envs.is_empty() {
-            cmd.arg(&format!(
-                "{} {}",
-                CmdArg::new_path("/usr/bin/env").into_string(self.clone()),
-                envs.iter()
-                    .map(|(e, v)| format!("{}=\"{}\"", e, v.into_string(self.clone())))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ));
+        cmd.arg("env").arg(format!(
+            "LD_LIBRARY_PATH={}",
+            lib_paths.into_string(self.clone())
+        ));
+        for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
+            cmd.arg(format!("{}={}", env_name, env::var(env_name).unwrap()));
         }
-        cmd.args(command);
-        if let Some(wd) = cwd {
-            cmd.current_dir(CmdArg::new_path(wd).into_string(self.clone()));
+        for (e, v) in envs {
+            cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
+        }
+        for carg in command {
+            cmd.arg(carg.into_string(self.clone()));
         }
         Ok(cmd)
     }
