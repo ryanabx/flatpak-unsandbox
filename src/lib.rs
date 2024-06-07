@@ -188,6 +188,25 @@ impl FlatpakInfo {
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
         }
+        log::debug!(
+            "exec {} {}",
+            cmd.get_program().to_string_lossy(),
+            cmd.get_args()
+                .map(|x| x.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
+        log::trace!(
+            "ENV: {}",
+            cmd.get_envs()
+                .map(|(x, y)| format!(
+                    "{}={}",
+                    x.to_string_lossy(),
+                    y.map_or("".into(), |x| x.to_string_lossy())
+                ))
+                .collect::<Vec<_>>()
+                .join(" ")
+        );
         Ok(cmd)
     }
 }
