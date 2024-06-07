@@ -30,6 +30,7 @@ fn main() -> Result<(), UnsandboxError> {
     }
     let cli = Cli::parse();
     if !cli.command.is_empty() {
+        log::debug!("Command: {:?} :: Envs: {:?}", cli.command, cli.env);
         let cmd = cli
             .command
             .iter()
