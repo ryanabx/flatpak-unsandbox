@@ -160,16 +160,12 @@ impl FlatpakInfo {
         command: Vec<CmdArg>,
         envs: HashMap<String, CmdArg>,
         cwd: Option<PathBuf>,
-        options: UnsandboxOptions,
     ) -> Result<Command, UnsandboxError> {
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
         let ld_path = self.get_ld_path()?;
         let mut cmd = Command::new("/usr/bin/flatpak-spawn");
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
-        }
-        if options.clear_env {
-            cmd.env_clear();
         }
         cmd.arg("--host");
         // ENVS

@@ -14,12 +14,6 @@ struct Cli {
     /// environment variables to add
     #[arg(short, long)]
     env: Vec<String>,
-    /// translate environment variables
-    #[arg(long)]
-    translate_env: bool,
-    /// clears environment variables
-    #[arg(long)]
-    clear_env: bool,
 }
 
 fn main() -> Result<(), UnsandboxError> {
@@ -49,18 +43,7 @@ fn main() -> Result<(), UnsandboxError> {
                 .collect::<HashMap<_, _>>();
             let info = flatpak_unsandbox::FlatpakInfo::new()?;
 
-            match info
-                .run_unsandboxed(
-                    cmd,
-                    envs,
-                    None,
-                    flatpak_unsandbox::UnsandboxOptions {
-                        translate_env: cli.translate_env,
-                        clear_env: cli.clear_env,
-                    },
-                )?
-                .output()
-            {
+            match info.run_unsandboxed(cmd, envs, None)?.output() {
                 Ok(out) => {
                     log::info!("stdout: {}", String::from_utf8(out.stdout).unwrap());
                     log::info!("stderr: {}", String::from_utf8(out.stderr).unwrap());
