@@ -64,7 +64,7 @@ fn main() -> Result<(), UnsandboxError> {
                 Ok(out) => {
                     log::info!("stdout: {}", String::from_utf8(out.stdout).unwrap());
                     log::info!("stderr: {}", String::from_utf8(out.stderr).unwrap());
-                    log::info!("Exit code: {:?}", out.status);
+                    log::info!("Exit code: {:?}", out.status.code());
                     Ok(())
                 }
                 Err(e) => {
