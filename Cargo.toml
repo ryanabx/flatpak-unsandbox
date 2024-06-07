@@ -11,8 +11,18 @@ description = "Run your flatpak app outside of the sandbox."
 readme = "README.md"
 homepage = "https://ryanabx.github.io/flatpak-unsandbox"
 
+[lib]
+name = "flatpak_unsandbox"
+path = "src/lib.rs"
+
+[[bin]]
+name = "flatpak-unsandbox"
+path = "src/bin.rs"
+
 [dependencies]
+clap = { version = "4.5.6", features = ["derive"] }
 configparser = "3.0.4"
+env_logger = "0.11.3"
 log = "0.4.21"
 thiserror = "^1"
 zbus = { version = "4.2.2", features = ["blocking"] }
