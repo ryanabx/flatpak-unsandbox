@@ -23,7 +23,7 @@ struct Cli {
 }
 
 fn main() -> Result<(), UnsandboxError> {
-    env_logger::init();
+    simple_logger::init_with_level(log::Level::Trace).unwrap();
     if !flatpak_unsandbox::is_flatpaked() {
         log::error!("Run this command inside a flatpak!");
         return Err(UnsandboxError::NotSandboxed);
