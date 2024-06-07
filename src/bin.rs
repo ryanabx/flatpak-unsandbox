@@ -59,10 +59,12 @@ fn main() -> Result<(), UnsandboxError> {
                         clear_env: cli.clear_env,
                     },
                 )?
-                .status()
+                .output()
             {
-                Ok(code) => {
-                    log::info!("Command exited with code {:?}", code);
+                Ok(out) => {
+                    log::info!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+                    log::info!("stderr: {}", String::from_utf8(out.stderr).unwrap());
+                    log::info!("Exit code: {:?}", out.status);
                     Ok(())
                 }
                 Err(e) => {
