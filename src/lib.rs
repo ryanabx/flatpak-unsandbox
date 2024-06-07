@@ -172,21 +172,18 @@ impl FlatpakInfo {
             cmd.env_clear();
         }
         cmd.arg("--host");
-        cmd.arg("env").arg(format!(
-            "LD_LIBRARY_PATH={}",
-            lib_paths.into_string(self.clone())
-        ));
-        for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
-            cmd.arg(format!("{}={}", env_name, env::var(env_name).unwrap()));
-        }
-        for (e, v) in envs {
-            cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
-        }
         cmd.arg(ld_path)
             .arg("--library-path")
             .arg(&lib_paths.into_string(self.clone()));
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
+        }
+        cmd.env("LD_LIBRARY_PATH", lib_paths.into_string(self.clone()));
+        for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
+            cmd.env(env_name, env::var(env_name).unwrap());
+        }
+        for (e, v) in envs {
+            cmd.env(e, v.into_string(self.clone()));
         }
         log::debug!(
             "exec {} {}",
