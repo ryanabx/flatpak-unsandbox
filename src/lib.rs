@@ -163,7 +163,7 @@ impl FlatpakInfo {
         options: UnsandboxOptions,
     ) -> Result<Command, UnsandboxError> {
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
-        // let ld_path = self.get_ld_path()?;
+        let ld_path = self.get_ld_path()?;
         let mut cmd = Command::new("/usr/bin/flatpak-spawn");
         if let Some(cwd) = cwd {
             cmd.current_dir(cwd);
@@ -184,10 +184,10 @@ impl FlatpakInfo {
         for (e, v) in envs {
             cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
         }
-        // // LD_PATH
-        // cmd.arg(ld_path)
-        //     .arg("--library-path")
-        //     .arg(&lib_paths.into_string(self.clone()));
+        // LD_PATH
+        cmd.arg(ld_path)
+            .arg("--library-path")
+            .arg(&lib_paths.into_string(self.clone()));
         // COMMAND
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
