@@ -184,10 +184,10 @@ impl FlatpakInfo {
         for (e, v) in envs {
             cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
         }
-        // LD_PATH
-        cmd.arg(ld_path)
-            .arg("--library-path")
-            .arg(&lib_paths.into_string(self.clone()));
+        // // LD_PATH
+        // cmd.arg(ld_path)
+        //     .arg("--library-path")
+        //     .arg(&lib_paths.into_string(self.clone()));
         // COMMAND
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
