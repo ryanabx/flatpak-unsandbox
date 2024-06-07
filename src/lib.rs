@@ -172,9 +172,9 @@ impl FlatpakInfo {
             cmd.env_clear();
         }
         cmd.arg("--host");
-        // cmd.arg(ld_path)
-        //     .arg("--library-path")
-        //     .arg(&lib_paths.into_string(self.clone()));
+        cmd.arg(ld_path)
+            .arg("--library-path")
+            .arg(&lib_paths.into_string(self.clone()));
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
         }
