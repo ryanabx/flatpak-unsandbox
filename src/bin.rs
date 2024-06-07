@@ -27,37 +27,51 @@ fn main() -> Result<(), UnsandboxError> {
     if !flatpak_unsandbox::is_flatpaked() {
         log::error!("Run this command inside a flatpak!");
         return Err(UnsandboxError::NotSandboxed);
-    }
-    let cli = Cli::parse();
-    if !cli.command.is_empty() {
-        log::debug!("Command: {:?} :: Envs: {:?}", cli.command, cli.env);
-        let cmd = cli
-            .command
-            .iter()
-            .map(|x| flatpak_unsandbox::CmdArg::new_guess(x.clone()))
-            .collect::<Vec<_>>();
-        let envs = cli
-            .env
-            .iter()
-            .map(|x| {
-                let (x1, x2) = x.split_once("=").unwrap();
-                (
-                    x1.to_string(),
-                    flatpak_unsandbox::CmdArg::new_guess(x2.to_string()),
-                )
-            })
-            .collect::<HashMap<_, _>>();
-        let info = flatpak_unsandbox::FlatpakInfo::new()?;
+    } else {
+        let cli = Cli::parse();
+        if !cli.command.is_empty() {
+            log::debug!("Command: {:?} :: Envs: {:?}", cli.command, cli.env);
+            let cmd = cli
+                .command
+                .iter()
+                .map(|x| flatpak_unsandbox::CmdArg::new_guess(x.clone()))
+                .collect::<Vec<_>>();
+            let envs = cli
+                .env
+                .iter()
+                .map(|x| {
+                    let (x1, x2) = x.split_once("=").unwrap();
+                    (
+                        x1.to_string(),
+                        flatpak_unsandbox::CmdArg::new_guess(x2.to_string()),
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            let info = flatpak_unsandbox::FlatpakInfo::new()?;
 
-        info.run_unsandboxed(
-            cmd,
-            envs,
-            None,
-            flatpak_unsandbox::UnsandboxOptions {
-                translate_env: cli.translate_env,
-                clear_env: cli.clear_env,
-            },
-        )?;
+            match info
+                .run_unsandboxed(
+                    cmd,
+                    envs,
+                    None,
+                    flatpak_unsandbox::UnsandboxOptions {
+                        translate_env: cli.translate_env,
+                        clear_env: cli.clear_env,
+                    },
+                )?
+                .status()
+            {
+                Ok(code) => {
+                    log::info!("Command exited with code {:?}", code);
+                    Ok(())
+                }
+                Err(e) => {
+                    log::error!("Command ran into an issue: {:?}", e);
+                    Err(e.into())
+                }
+            }
+        } else {
+            Ok(())
+        }
     }
-    Ok(())
 }
