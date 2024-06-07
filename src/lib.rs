@@ -172,35 +172,31 @@ impl FlatpakInfo {
             cmd.env_clear();
         }
         cmd.arg("--host");
+        // ENVS
+        cmd.arg("env");
+        cmd.arg(format!(
+            "LD_LIBRARY_PATH={}",
+            lib_paths.into_string(self.clone())
+        ));
+        for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
+            cmd.arg(format!("{}={}", env_name, env::var(env_name).unwrap()));
+        }
+        for (e, v) in envs {
+            cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
+        }
+        // LD_PATH
         cmd.arg(ld_path)
             .arg("--library-path")
             .arg(&lib_paths.into_string(self.clone()));
+        // COMMAND
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
-        }
-        // cmd.env("LD_LIBRARY_PATH", lib_paths.into_string(self.clone()));
-        for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
-            cmd.env(env_name, env::var(env_name).unwrap());
-        }
-        for (e, v) in envs {
-            cmd.env(e, v.into_string(self.clone()));
         }
         log::debug!(
             "exec {} {}",
             cmd.get_program().to_string_lossy(),
             cmd.get_args()
                 .map(|x| x.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join(" ")
-        );
-        log::trace!(
-            "ENV: {}",
-            cmd.get_envs()
-                .map(|(x, y)| format!(
-                    "{}={}",
-                    x.to_string_lossy(),
-                    y.map_or("".into(), |x| x.to_string_lossy())
-                ))
                 .collect::<Vec<_>>()
                 .join(" ")
         );
