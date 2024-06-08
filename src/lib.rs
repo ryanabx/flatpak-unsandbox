@@ -160,6 +160,7 @@ impl FlatpakInfo {
         command: Vec<CmdArg>,
         envs: HashMap<String, CmdArg>,
         cwd: Option<PathBuf>,
+        use_bundled_libs: bool,
     ) -> Result<Command, UnsandboxError> {
         let lib_paths = CmdArg::new_path_list(self.get_all_lib_paths()?, ":".into());
         let ld_path = self.get_ld_path()?;
@@ -170,20 +171,24 @@ impl FlatpakInfo {
         cmd.arg("--host");
         // ENVS
         cmd.arg("env");
-        cmd.arg(format!(
-            "LD_LIBRARY_PATH={}",
-            lib_paths.into_string(self.clone())
-        ));
+        if use_bundled_libs {
+            cmd.arg(format!(
+                "LD_LIBRARY_PATH={}",
+                lib_paths.into_string(self.clone())
+            ));
+        }
         for env_name in ["XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"] {
             cmd.arg(format!("{}={}", env_name, env::var(env_name).unwrap()));
         }
         for (e, v) in envs {
             cmd.arg(format!("{}={}", e, v.into_string(self.clone())));
         }
-        // LD_PATH
-        cmd.arg(ld_path)
-            .arg("--library-path")
-            .arg(&lib_paths.into_string(self.clone()));
+        if use_bundled_libs {
+            // LD_PATH
+            cmd.arg(ld_path)
+                .arg("--library-path")
+                .arg(&lib_paths.into_string(self.clone()));
+        }
         // COMMAND
         for carg in command {
             cmd.arg(carg.into_string(self.clone()));
