@@ -48,12 +48,10 @@ fn main() -> Result<(), UnsandboxError> {
 
             match info
                 .run_unsandboxed(cmd, envs, None, cli.use_bundled_libs)?
-                .output()
+                .status()
             {
                 Ok(out) => {
-                    log::info!("stdout: {}", String::from_utf8(out.stdout).unwrap());
-                    log::info!("stderr: {}", String::from_utf8(out.stderr).unwrap());
-                    log::info!("Exit code: {:?}", out.status.code());
+                    log::info!("Exit code: {:?}", out.code());
                     Ok(())
                 }
                 Err(e) => {
